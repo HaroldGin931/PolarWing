@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var showWelcome = true
+    @State private var isOnboardingComplete = UserDefaults.standard.string(forKey: "username") != nil
     
     var body: some View {
-        if showWelcome {
-            WelcomeView(showWelcome: $showWelcome)
-        } else {
+        if isOnboardingComplete {
             MainTabView()
+        } else {
+            OnboardingView(isOnboardingComplete: $isOnboardingComplete)
         }
     }
 }
