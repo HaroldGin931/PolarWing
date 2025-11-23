@@ -16,6 +16,7 @@ struct CameraView: View {
     @State private var capturedImage: UIImage?
     @State private var showImagePreview = false
     @State private var showPhotoGallery = false
+    var onDismiss: (() -> Void)? = nil
     
     var body: some View {
         ZStack {
@@ -28,7 +29,11 @@ struct CameraView: View {
                     // 顶部工具栏
                     HStack {
                         Button(action: {
-                            dismiss()
+                            if let onDismiss = onDismiss {
+                                onDismiss()
+                            } else {
+                                dismiss()
+                            }
                         }) {
                             Image(systemName: "xmark")
                                 .font(.title2)

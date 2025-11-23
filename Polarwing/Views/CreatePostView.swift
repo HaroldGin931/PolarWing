@@ -7,14 +7,14 @@
 
 import SwiftUI
 import PhotosUI
+import Photos
 
 struct CreatePostView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedImage: UIImage?
     @State private var caption = ""
     @State private var showCamera = false
-    @State private var showPhotoPicker = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showPhotoGallery = false
     
     var body: some View {
         NavigationView {
@@ -57,7 +57,9 @@ struct CreatePostView: View {
                             .cornerRadius(16)
                         }
                         
-                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        Button(action: {
+                            showPhotoGallery = true
+                        }) {
                             VStack(spacing: 12) {
                                 Image(systemName: "photo.on.rectangle")
                                     .font(.system(size: 50))
@@ -99,13 +101,148 @@ struct CreatePostView: View {
             .fullScreenCover(isPresented: $showCamera) {
                 CameraView()
             }
-            .onChange(of: selectedPhotoItem) { oldValue, newValue in
-                Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        selectedImage = image
+            .fullScreenCover(isPresented: $showPhotoGallery) {
+                PhotoGalleryPickerView { image in
+                    selectedImage = image
+                    showPhotoGallery = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 照片选择器（仅显示 Polarwing 相册）
+struct PhotoGalleryPickerView: View {
+    @Environment(\.dismiss) var dismiss
+    @StateObject private var viewModel = PhotoGalleryViewModel()
+    let onSelect: (UIImage) -> Void
+    
+    let columns = [
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2)
+    ]
+    
+    var body: some View {
+        NavigationView {
+            Group {
+                if viewModel.photoAssets.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("没有照片")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        Text("请先使用相机拍摄照片")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 2) {
+                            ForEach(viewModel.photoAssets, id: \.localIdentifier) { asset in
+                                GeometryReader { geometry in
+                                    PickerThumbnailView(asset: asset) { image in
+                                        onSelect(image)
+                                    }
+                                    .frame(width: geometry.size.width, height: geometry.size.width)
+                                }
+                                .aspectRatio(1, contentMode: .fit)
+                                .clipped()
+                            }
+                        }
+                        .padding(.horizontal, 2)
                     }
                 }
+            }
+            .navigationTitle("选择照片")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
+                    }
+                }
+            }
+        }
+        .onAppear {
+            viewModel.loadPhotos()
+        }
+    }
+}
+
+// MARK: - 选择器缩略图
+struct PickerThumbnailView: View {
+    let asset: PHAsset
+    let onSelect: (UIImage) -> Void
+    @State private var thumbnail: UIImage?
+    
+    var body: some View {
+        Button(action: {
+            loadFullImage()
+        }) {
+            Group {
+                if let thumbnail = thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay(
+                            ProgressView()
+                                .tint(Color(red: 172/255, green: 237/255, blue: 228/255))
+                        )
+                }
+            }
+        }
+        .onAppear {
+            loadThumbnail()
+        }
+    }
+    
+    private func loadThumbnail() {
+        let imageManager = PHImageManager.default()
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.isNetworkAccessAllowed = false
+        options.isSynchronous = false
+        
+        let targetSize = CGSize(width: 200, height: 200)
+        
+        imageManager.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: options
+        ) { image, _ in
+            self.thumbnail = image
+        }
+    }
+    
+    private func loadFullImage() {
+        let imageManager = PHImageManager.default()
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        
+        let screenScale = UIScreen.main.scale
+        let screenSize = UIScreen.main.bounds.size
+        let targetSize = CGSize(
+            width: screenSize.width * screenScale,
+            height: screenSize.height * screenScale
+        )
+        
+        imageManager.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: .aspectFit,
+            options: options
+        ) { image, _ in
+            if let image = image {
+                onSelect(image)
             }
         }
     }
