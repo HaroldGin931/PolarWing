@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AuthenticationServices
 
 struct OnboardingView: View {
     @StateObject private var passkeyManager = PasskeyManager.shared
@@ -80,21 +79,14 @@ struct OnboardingView: View {
         // 保存用户名
         UserDefaults.standard.set(username, forKey: "username")
         
-        // 创建Passkey
-        guard let window = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .flatMap({ $0.windows })
-            .first else {
-            isCreatingPasskey = false
-            return
-        }
-        
-        passkeyManager.createPasskey(anchor: window) { result in
+        // 在 Secure Enclave 中生成密钥对
+        passkeyManager.generateKeyPair { result in
             isCreatingPasskey = false
             
             switch result {
-            case .success(let credentialID):
-                print("账户设置成功: \(credentialID.base64EncodedString())")
+            case .success(let publicKey):
+                print("✅ 账户设置成功")
+                print("  - 公钥: \(publicKey.base64EncodedString())")
                 isOnboardingComplete = true
             case .failure(let error):
                 errorMessage = error.localizedDescription

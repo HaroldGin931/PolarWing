@@ -10,7 +10,7 @@ import SwiftUI
 struct ProfileView: View {
     @StateObject private var passkeyManager = PasskeyManager.shared
     @State private var tapCount = 0
-    @State private var showPasskeyInfo = false
+    @State private var showDebugView = false
     
     // 模拟当前用户的帖子（实际应该从数据源筛选）
     let currentUserId = "user1"
@@ -35,7 +35,7 @@ struct ProfileView: View {
                         .onTapGesture {
                             tapCount += 1
                             if tapCount >= 3 {
-                                showPasskeyInfo = true
+                                showDebugView = true
                                 tapCount = 0
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -88,43 +88,45 @@ struct ProfileView: View {
             }
             .navigationTitle("我的")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showPasskeyInfo) {
-                PasskeyDebugView()
+            .sheet(isPresented: $showDebugView) {
+                SecureEnclaveDebugView()
             }
         }
     }
 }
 
-struct PasskeyDebugView: View {
+struct SecureEnclaveDebugView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var passkeyManager = PasskeyManager.shared
     @State private var copiedItem = ""
-    @State private var passkeyID = "未设置"
-    @State private var attestationObject = "未设置"
     @State private var publicKey = "未设置"
     @State private var publicKeyHex = "未设置"
     @State private var testMessage = "Hello Sui Blockchain!"
     @State private var lastSignature = "未生成"
     @State private var verificationResult = ""
     @State private var isSigning = false
+    @State private var signatureResult: SignatureResult?
+    @State private var showExportSheet = false
+    @State private var showImportSheet = false
+    @State private var importPrivateKey = ""
+    @State private var exportedPrivateKey = ""
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Passkey ID
-                    DebugInfoSection(
-                        title: "Passkey ID",
-                        content: passkeyID,
-                        copiedItem: $copiedItem
-                    )
-                    
-                    // Attestation Object
-                    DebugInfoSection(
-                        title: "Attestation Object",
-                        content: attestationObject,
-                        copiedItem: $copiedItem
-                    )
+                    // 说明文字
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Secure Enclave P256 密钥")
+                            .font(.headline)
+                        
+                        Text("私钥安全存储在 Secure Enclave 中，签名需要 Face ID/Touch ID 认证")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(12)
                     
                     // Public Key (Base64)
                     DebugInfoSection(
@@ -207,27 +209,78 @@ struct PasskeyDebugView: View {
                             .background(verificationResult.contains("✅") ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
                             .cornerRadius(8)
                         }
+                        
+                        // 显示 Sui Move 代码
+                        if let result = signatureResult, let pk = passkeyManager.publicKey {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Sui Move 验证代码")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Text(result.toSuiMoveArgs(publicKey: pk))
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .padding()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(8)
+                                    .textSelection(.enabled)
+                            }
+                        }
                     }
                     
                     Divider()
                         .padding(.vertical)
                     
-                    // 重新创建 Passkey 按钮
-                    Button(action: recreatePasskey) {
-                        HStack {
-                            Image(systemName: "arrow.clockwise")
-                            Text("重新创建 Passkey")
+                    // 密钥管理部分
+                    VStack(spacing: 12) {
+                        Text("密钥管理")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        // 导出私钥
+                        Button(action: { showExportSheet = true }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("导出私钥")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        
+                        // 导入私钥
+                        Button(action: { showImportSheet = true }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("导入私钥")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.purple)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        
+                        // 重新生成密钥对
+                        Button(action: regenerateKeyPair) {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("重新生成密钥对")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Passkey 调试")
+            .navigationTitle("Secure Enclave 调试")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -237,97 +290,67 @@ struct PasskeyDebugView: View {
                 }
             }
             .onAppear {
-                loadPasskeyData()
+                loadPublicKey()
+            }
+            .sheet(isPresented: $showExportSheet) {
+                ExportPrivateKeyView(privateKey: exportedPrivateKey)
+            }
+            .sheet(isPresented: $showImportSheet) {
+                ImportPrivateKeyView(importText: $importPrivateKey, onImport: importPrivateKeyAction)
             }
         }
     }
     
-    private func loadPasskeyData() {
-        // 加载 Passkey ID
-        if let id = passkeyManager.currentCredentialID {
-            passkeyID = id
-        } else if let savedID = passkeyManager.getSavedCredentialID() {
-            passkeyID = savedID.base64EncodedString()
-        }
-        
-        // 加载 Attestation Object
-        if let attestation = passkeyManager.attestationObject {
-            attestationObject = attestation.base64EncodedString()
-        } else if let savedAttestation = passkeyManager.getSavedAttestationObject() {
-            attestationObject = savedAttestation.base64EncodedString()
-        }
-        
-        // 加载 Public Key
-        if let pk = passkeyManager.publicKey {
+    private func loadPublicKey() {
+        if let pk = passkeyManager.publicKey ?? passkeyManager.getSavedPublicKey() {
             publicKey = pk.base64EncodedString()
             publicKeyHex = pk.map { String(format: "%02x", $0) }.joined()
-        } else if let savedPK = passkeyManager.getSavedPublicKey() {
-            publicKey = savedPK.base64EncodedString()
-            publicKeyHex = savedPK.map { String(format: "%02x", $0) }.joined()
         }
         
-        // 打印调试信息
-        print("📱 Passkey 调试信息:")
-        print("  - Passkey ID: \(passkeyID)")
-        print("  - Attestation Object: \(attestationObject.prefix(50))...")
-        print("  - Public Key: \(publicKey)")
-        print("  - Public Key (Hex): \(publicKeyHex)")
+        print("📱 Secure Enclave 调试信息:")
+        print("  - 公钥 (Base64): \(publicKey)")
+        print("  - 公钥 (Hex): \(publicKeyHex)")
     }
     
-    private func recreatePasskey() {
-        guard let window = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .flatMap({ $0.windows })
-            .first else {
-            return
-        }
-        
-        passkeyManager.createPasskey(anchor: window) { result in
+    private func regenerateKeyPair() {
+        passkeyManager.generateKeyPair { result in
             switch result {
-            case .success(let credentialID):
-                print("✅ Passkey 重新创建成功: \(credentialID.base64EncodedString())")
-                // 重新加载数据
+            case .success:
+                print("✅ 密钥对重新生成成功")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    loadPasskeyData()
+                    loadPublicKey()
                 }
             case .failure(let error):
-                print("❌ Passkey 创建失败: \(error.localizedDescription)")
+                print("❌ 密钥生成失败: \(error.localizedDescription)")
             }
         }
     }
     
     private func signTestMessage() {
-        guard let window = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .flatMap({ $0.windows })
-            .first else {
-            return
-        }
-        
         isSigning = true
         verificationResult = ""
         
-        passkeyManager.signMessage(testMessage, anchor: window) { result in
+        passkeyManager.signMessage(testMessage) { result in
             isSigning = false
             
             switch result {
-            case .success(let signatureResult):
-                lastSignature = signatureResult.signature.base64EncodedString()
+            case .success(let result):
+                lastSignature = result.signature.base64EncodedString()
+                signatureResult = result
                 
                 print("✅ 签名成功")
-                print("  - Message: \(testMessage)")
-                print("  - Signature: \(lastSignature)")
+                print("  - 消息: \(testMessage)")
+                print("  - 签名: \(lastSignature)")
                 
                 // 立即验证签名
                 if let publicKeyData = passkeyManager.publicKey ?? passkeyManager.getSavedPublicKey() {
                     let isValid = passkeyManager.verifySignature(
-                        signature: signatureResult.signature,
-                        authenticatorData: signatureResult.authenticatorData,
-                        clientDataJSON: signatureResult.clientDataJSON,
+                        signature: result.signature,
+                        message: result.message,
                         publicKey: publicKeyData
                     )
                     
-                    verificationResult = isValid ? "✅ 签名验证成功！" : "❌ 签名验证失败"
+                    verificationResult = isValid ? "✅ 签名验证成功！可用于 Sui 链上验证" : "❌ 签名验证失败"
                 } else {
                     verificationResult = "❌ 无法获取公钥"
                 }
@@ -335,6 +358,151 @@ struct PasskeyDebugView: View {
             case .failure(let error):
                 print("❌ 签名失败: \(error.localizedDescription)")
                 verificationResult = "❌ 签名失败: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func importPrivateKeyAction() {
+        passkeyManager.importPrivateKey(importPrivateKey) { result in
+            switch result {
+            case .success:
+                print("✅ 私钥导入成功")
+                showImportSheet = false
+                importPrivateKey = ""
+                loadPublicKey()
+            case .failure(let error):
+                print("❌ 私钥导入失败: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+// 导出私钥视图
+struct ExportPrivateKeyView: View {
+    @Environment(\.dismiss) var dismiss
+    @StateObject private var passkeyManager = PasskeyManager.shared
+    @State private var copied = false
+    
+    let privateKey: String
+    
+    var actualPrivateKey: String {
+        passkeyManager.exportPrivateKey() ?? "无私钥"
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("⚠️ 安全警告")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                    
+                    Text("私钥非常重要，请妥善保管！\n• 不要分享给任何人\n• 建议离线保存\n• 丢失无法恢复")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(12)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("私钥 (Base64)")
+                        .font(.headline)
+                    
+                    Text(actualPrivateKey)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                        .textSelection(.enabled)
+                }
+                
+                Button(action: {
+                    UIPasteboard.general.string = actualPrivateKey
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        copied = false
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        Text(copied ? "已复制" : "复制私钥")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(copied ? Color.green : Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("导出私钥")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 导入私钥视图
+struct ImportPrivateKeyView: View {
+    @Environment(\.dismiss) var dismiss
+    @Binding var importText: String
+    let onImport: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("导入说明")
+                        .font(.headline)
+                    
+                    Text("粘贴之前导出的私钥 (Base64 格式)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                TextEditor(text: $importText)
+                    .font(.system(.caption, design: .monospaced))
+                    .padding(8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                    .frame(height: 200)
+                
+                Button(action: {
+                    onImport()
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down")
+                        Text("导入")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(importText.isEmpty ? Color.gray : Color.purple)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(importText.isEmpty)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("导入私钥")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
             }
         }
     }
