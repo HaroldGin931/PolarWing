@@ -233,6 +233,37 @@ class P256Signer: NSObject, ObservableObject {
     func getSavedPublicKey() -> Data? {
         return privateKey?.publicKey.x963Representation
     }
+    
+    // MARK: - Sui Address Generation
+    
+    /// 生成 Sui 地址
+    /// Sui 使用: BLAKE2b(flag || pubkey)[0..32]
+    /// flag = 0x00 for secp256r1
+    func generateSuiAddress() -> String? {
+        guard let publicKeyData = self.publicKey else {
+            return nil
+        }
+        
+        // Sui 使用的签名方案标志: 0x00 = Ed25519, 0x01 = Secp256k1, 0x02 = Secp256r1
+        let signatureSchemeFlag: UInt8 = 0x02 // Secp256r1 (P256)
+        
+        // 构造: flag || public_key
+        var dataToHash = Data([signatureSchemeFlag])
+        dataToHash.append(publicKeyData)
+        
+        // 使用 BLAKE2b 哈希 (256 bits = 32 bytes)
+        let hash = Self.blake2b(data: dataToHash, outputLength: 32)
+        
+        // Sui 地址是 32 字节的十六进制，前缀 0x
+        let address = "0x" + hash.map { String(format: "%02x", $0) }.joined()
+        
+        return address
+    }
+    
+    // BLAKE2b 哈希实现
+    private static func blake2b(data: Data, outputLength: Int) -> Data {
+        return Blake2b.hash(data: data, outputLength: outputLength)
+    }
 }
 
 // MARK: - 签名结果

@@ -101,6 +101,7 @@ struct P256SignerDebugView: View {
     @State private var copiedItem = ""
     @State private var publicKey = "未设置"
     @State private var publicKeyHex = "未设置"
+    @State private var suiAddress = "未生成"
     @State private var testMessage = "Hello P256 Signature!"
     @State private var lastSignature = "未生成"
     @State private var verificationResult = ""
@@ -139,6 +140,13 @@ struct P256SignerDebugView: View {
                     DebugInfoSection(
                         title: "P256 公钥 (Hex)",
                         content: publicKeyHex,
+                        copiedItem: $copiedItem
+                    )
+                    
+                    // Sui Address
+                    DebugInfoSection(
+                        title: "Sui 地址",
+                        content: suiAddress,
                         copiedItem: $copiedItem
                     )
                     
@@ -307,9 +315,15 @@ struct P256SignerDebugView: View {
             publicKeyHex = pk.map { String(format: "%02x", $0) }.joined()
         }
         
+        // 生成 Sui 地址
+        if let address = p256Signer.generateSuiAddress() {
+            suiAddress = address
+        }
+        
         print("📱 P256 Signer 调试信息:")
         print("  - 公钥 (Base64): \(publicKey)")
         print("  - 公钥 (Hex): \(publicKeyHex)")
+        print("  - Sui 地址: \(suiAddress)")
     }
     
     private func regenerateKeyPair() {
