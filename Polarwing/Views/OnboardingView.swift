@@ -15,6 +15,8 @@ struct OnboardingView: View {
     private let themeColor = Color(red: 172/255, green: 237/255, blue: 228/255)
     
     @State private var username = ""
+    @State private var selectedAvatar: UIImage?
+    @State private var showImagePicker = false
     @State private var isCreatingPasskey = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -24,10 +26,29 @@ struct OnboardingView: View {
             Spacer()
             
             VStack(spacing: 16) {
-                Image(systemName: "camera.circle.fill")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .foregroundColor(themeColor)
+                // 头像选择
+                Button(action: { showImagePicker = true }) {
+                    if let avatar = selectedAvatar {
+                        Image(uiImage: avatar)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 100, height: 100)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(themeColor, lineWidth: 3)
+                            )
+                    } else {
+                        Image(systemName: "camera.circle.fill")
+                            .resizable()
+                            .frame(width: 100, height: 100)
+                            .foregroundColor(themeColor)
+                    }
+                }
+                
+                Text(selectedAvatar == nil ? "点击上传头像" : "点击更换头像")
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 
                 Text("欢迎来到 Polarwing")
                     .font(.system(size: 32, weight: .bold))
@@ -68,6 +89,9 @@ struct OnboardingView: View {
             .padding(.horizontal, 32)
             
             Spacer()
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedAvatar)
         }
         .alert("设置失败", isPresented: $showError) {
             Button("重试", role: .cancel) {}
@@ -117,23 +141,46 @@ struct OnboardingView: View {
                         print("  - 签名 (Base64): \(signatureResult.signature.base64EncodedString())")
                         print("  - 签名长度: \(signatureResult.signature.count) 字节")
                         
-                        print("\n📋 准备发送的完整数据:")
-                        print("  - nickname: \(username)")
-                        print("  - avatarUrl: TBD")
-                        print("  - bio: TBD")
-                        print("  - suiAddress: \(suiAddress)")
-                        print("  - publicKey: \(publicKey.base64EncodedString())")
-                        print("  - signature: \(signatureResult.signature.base64EncodedString())")
-                        print("  - action: \(action)")
-                        print("  - timestamp: \(timestamp)")
-                        print("  - nonce: \(nonce)")
-                        
                         // 调用 API
                         Task {
                             do {
+                                var avatarUrl = "TBD"
+                                
+                                // 如果用户选择了头像，先上传头像
+                                if let avatar = selectedAvatar {
+                                    print("🖼️ 开始上传头像...")
+                                    
+                                    let uploadResponse = try await APIService.shared.uploadMedia(
+                                        image: avatar,
+                                        storageType: "walrus",
+                                        suiAddress: suiAddress,
+                                        publicKey: publicKey.base64EncodedString(),
+                                        signature: signatureResult.signature.base64EncodedString(),
+                                        action: action,
+                                        timestamp: timestamp,
+                                        nonce: nonce
+                                    )
+                                    
+                                    if let uploadedFile = uploadResponse.files.first {
+                                        avatarUrl = uploadedFile.url
+                                        print("✅ 头像上传成功: \(avatarUrl)")
+                                    }
+                                }
+                                
+                                print("\n📋 准备发送的完整数据:")
+                                print("  - nickname: \(username)")
+                                print("  - avatarUrl: \(avatarUrl)")
+                                print("  - bio: TBD")
+                                print("  - suiAddress: \(suiAddress)")
+                                print("  - publicKey: \(publicKey.base64EncodedString())")
+                                print("  - signature: \(signatureResult.signature.base64EncodedString())")
+                                print("  - action: \(action)")
+                                print("  - timestamp: \(timestamp)")
+                                print("  - nonce: \(nonce)")
+                                
                                 let profile = try await APIService.shared.updateProfile(
                                     nickname: username,
-                                    avatarUrl: "TBD",
+                                    avatarUrl: avatarUrl,
                                     bio: "TBD",
                                     suiAddress: suiAddress,
                                     publicKey: publicKey.base64EncodedString(),
@@ -174,6 +221,47 @@ struct OnboardingView: View {
                 errorMessage = error.localizedDescription
                 showError = true
             }
+        }
+    }
+}
+
+// MARK: - Image Picker
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.dismiss) var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        picker.allowsEditing = true
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let editedImage = info[.editedImage] as? UIImage {
+                parent.image = editedImage
+            } else if let originalImage = info[.originalImage] as? UIImage {
+                parent.image = originalImage
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
 }

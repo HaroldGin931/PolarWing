@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 
 // MARK: - Error Types
 struct APIError: Codable {
@@ -55,6 +56,101 @@ struct ProfileResponse: Codable {
         case bio
         case createdAt = "created_at"
         case nickname
+        case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - Media Upload Models
+struct MediaUploadResponse: Codable {
+    let files: [UploadedFile]
+    let storageType: String
+    let totalSize: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case files
+        case storageType = "storage_type"
+        case totalSize = "total_size"
+    }
+}
+
+struct UploadedFile: Codable {
+    let filename: String
+    let size: Int
+    let contentType: String
+    let url: String
+    let blobId: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case filename, size
+        case contentType = "content_type"
+        case url
+        case blobId = "blob_id"
+    }
+}
+
+// MARK: - Post Models
+struct CreatePostRequest: Codable {
+    let content: PostContent
+    let storageType: String
+    let tags: [String]
+    let visibility: String
+    
+    enum CodingKeys: String, CodingKey {
+        case content
+        case storageType = "storage_type"
+        case tags
+        case visibility
+    }
+}
+
+struct PostContent: Codable {
+    let ciphertext: String
+    let content: String
+    let encrypted: Bool
+    let mediaUrls: [String]
+    let nonce: String
+    let sealPolicyId: String
+    let title: String
+    
+    enum CodingKeys: String, CodingKey {
+        case ciphertext, content, encrypted
+        case mediaUrls = "media_urls"
+        case nonce
+        case sealPolicyId = "seal_policy_id"
+        case title
+    }
+}
+
+struct PostResponse: Codable {
+    let id: String
+    let author: String
+    let contentTitle: String?
+    let contentText: String?
+    let contentMediaUrls: [String]?
+    let tags: [String]
+    let visibility: String
+    let storageType: String
+    let blobId: String?
+    let sealPolicyId: String?
+    let txDigest: String?
+    let likeCount: Int
+    let commentCount: Int
+    let createdAt: String
+    let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, author
+        case contentTitle = "content_title"
+        case contentText = "content_text"
+        case contentMediaUrls = "content_media_urls"
+        case tags, visibility
+        case storageType = "storage_type"
+        case blobId = "blob_id"
+        case sealPolicyId = "seal_policy_id"
+        case txDigest = "tx_digest"
+        case likeCount = "like_count"
+        case commentCount = "comment_count"
+        case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
 }
@@ -133,6 +229,267 @@ class APIService {
             let profile = try decoder.decode(ProfileResponse.self, from: data)
             print("✅ 成功解析 ProfileResponse: \(profile)")
             return profile
+            
+        case 400, 401, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
+    
+    // MARK: - Media Upload API
+    func uploadMedia(
+        image: UIImage,
+        storageType: String = "walrus",
+        suiAddress: String,
+        publicKey: String,
+        signature: String,
+        action: String = "upload",
+        timestamp: Int,
+        nonce: Int
+    ) async throws -> MediaUploadResponse {
+        let url = URL(string: "\(baseURL)/media/upload")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        request.setValue(publicKey, forHTTPHeaderField: "X-Sui-Public-Key")
+        request.setValue(signature, forHTTPHeaderField: "X-Sui-Signature")
+        request.setValue(action, forHTTPHeaderField: "X-Sui-Action")
+        request.setValue("\(timestamp)", forHTTPHeaderField: "X-Sui-Timestamp")
+        request.setValue("\(nonce)", forHTTPHeaderField: "X-Sui-Nonce")
+        
+        // 构建 multipart/form-data body
+        var body = Data()
+        
+        // 添加 storage_type 字段
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"storage_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(storageType)\r\n".data(using: .utf8)!)
+        
+        // 添加图片文件
+        if let imageData = image.jpegData(compressionQuality: 0.8) {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"files\"; filename=\"avatar.jpeg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(imageData)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        
+        print("📤 上传图片到: \(url.absoluteString)")
+        print("📋 请求头:")
+        request.allHTTPHeaderFields?.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        print("📦 请求体大小: \(body.count) 字节")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 200:
+            let decoder = JSONDecoder()
+            let uploadResponse = try decoder.decode(MediaUploadResponse.self, from: data)
+            print("✅ 成功上传图片: \(uploadResponse.files.first?.url ?? "无URL")")
+            return uploadResponse
+            
+        case 400, 401, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
+    
+    // MARK: - Get Profile API
+    func getProfile(
+        suiAddress: String
+    ) async throws -> ProfileResponse {
+        let url = URL(string: "\(baseURL)/profile/\(suiAddress)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        // Headers
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        
+        print("📤 获取用户信息: \(url.absoluteString)")
+        print("📋 请求头:")
+        request.allHTTPHeaderFields?.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        } else {
+            print("📦 响应体: (无法解析为字符串, \(data.count) 字节)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 200:
+            let decoder = JSONDecoder()
+            let profile = try decoder.decode(ProfileResponse.self, from: data)
+            print("✅ 成功获取用户信息: \(profile.nickname)")
+            return profile
+            
+        case 400, 401, 404, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
+    
+    // MARK: - Post API
+    func createPost(
+        title: String,
+        content: String,
+        mediaUrls: [String],
+        tags: [String] = [],
+        visibility: String = "public",
+        storageType: String = "walrus",
+        suiAddress: String,
+        publicKey: String,
+        signature: String,
+        action: String = "post",
+        timestamp: Int,
+        nonce: Int
+    ) async throws -> PostResponse {
+        let url = URL(string: "\(baseURL)/posts")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        // Headers
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        request.setValue(publicKey, forHTTPHeaderField: "X-Sui-Public-Key")
+        request.setValue(signature, forHTTPHeaderField: "X-Sui-Signature")
+        request.setValue(action, forHTTPHeaderField: "X-Sui-Action")
+        request.setValue("\(timestamp)", forHTTPHeaderField: "X-Sui-Timestamp")
+        request.setValue("\(nonce)", forHTTPHeaderField: "X-Sui-Nonce")
+        
+        // Body
+        let postContent = PostContent(
+            ciphertext: "",
+            content: content,
+            encrypted: false,
+            mediaUrls: mediaUrls,
+            nonce: "\(nonce)",
+            sealPolicyId: "",
+            title: title
+        )
+        
+        let body = CreatePostRequest(
+            content: postContent,
+            storageType: storageType,
+            tags: tags,
+            visibility: visibility
+        )
+        
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        print("📤 创建帖子: \(url.absoluteString)")
+        print("📋 请求头:")
+        request.allHTTPHeaderFields?.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
+            print("📦 请求体: \(bodyString)")
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        } else {
+            print("📦 响应体: (无法解析为字符串, \(data.count) 字节)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 201:
+            let decoder = JSONDecoder()
+            let post = try decoder.decode(PostResponse.self, from: data)
+            print("✅ 成功创建帖子: \(post.id)")
+            return post
             
         case 400, 401, 500:
             let decoder = JSONDecoder()

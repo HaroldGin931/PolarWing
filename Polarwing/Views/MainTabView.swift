@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var previousTab = 0
+    @State private var showCreatePost = false
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -31,8 +32,8 @@ struct MainTabView: View {
                 Text("Camera")
             }
             
-            // New Post
-            CreatePostView()
+            // New Post (占位符，实际使用 sheet)
+            Color.clear
                 .tag(2)
                 .tabItem {
                     Image(systemName: "paperplane")
@@ -49,9 +50,17 @@ struct MainTabView: View {
         }
         .tint(Color(red: 172/255, green: 237/255, blue: 228/255))
         .onChange(of: selectedTab) { oldValue, newValue in
-            if newValue != 1 {
+            if newValue == 2 {
+                // 点击 New Post 时显示 sheet
+                showCreatePost = true
+                // 返回到之前的 tab
+                selectedTab = previousTab
+            } else if newValue != 1 {
                 previousTab = newValue
             }
+        }
+        .sheet(isPresented: $showCreatePost) {
+            CreatePostView()
         }
     }
 }

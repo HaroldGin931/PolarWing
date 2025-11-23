@@ -11,12 +11,24 @@ struct ProfileView: View {
     @StateObject private var p256Signer = P256Signer.shared
     @State private var tapCount = 0
     @State private var showDebugView = false
+    @State private var profileData: ProfileResponse?
+    @State private var isLoading = false
+    @State private var avatarImage: UIImage?
     
     // 模拟当前用户的帖子（实际应该从数据源筛选）
     let currentUserId = "user1"
     
     var username: String {
-        UserDefaults.standard.string(forKey: "username") ?? "用户"
+        profileData?.nickname ?? UserDefaults.standard.string(forKey: "username") ?? "用户"
+    }
+    
+    var bio: String {
+        profileData?.bio ?? "TBD"
+    }
+    
+    var avatarUrl: String? {
+        guard let url = profileData?.avatarUrl, url != "TBD" else { return nil }
+        return url
     }
     
     var userPosts: [Post] {
@@ -28,24 +40,47 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 // 用户信息头部
                 VStack(spacing: 16) {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 80, height: 80)
-                        .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
-                        .onTapGesture {
-                            tapCount += 1
-                            if tapCount >= 3 {
-                                showDebugView = true
-                                tapCount = 0
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                tapCount = 0
-                            }
+                    // 头像
+                    Group {
+                        if let avatarImage = avatarImage {
+                            Image(uiImage: avatarImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color(red: 172/255, green: 237/255, blue: 228/255), lineWidth: 2)
+                                )
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 80, height: 80)
+                                .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
                         }
+                    }
+                    .onTapGesture {
+                        tapCount += 1
+                        if tapCount >= 3 {
+                            showDebugView = true
+                            tapCount = 0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            tapCount = 0
+                        }
+                    }
                     
                     Text(username)
                         .font(.title2)
                         .fontWeight(.semibold)
+                    
+                    if bio != "TBD" {
+                        Text(bio)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
                     
                     HStack(spacing: 30) {
                         VStack(spacing: 4) {
@@ -88,8 +123,73 @@ struct ProfileView: View {
             }
             .navigationTitle("我的")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: loadProfile) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
+                    }
+                    .disabled(isLoading)
+                }
+            }
+            .overlay {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.2))
+                }
+            }
             .sheet(isPresented: $showDebugView) {
                 P256SignerDebugView()
+            }
+            .onAppear {
+                loadProfile()
+            }
+        }
+    }
+    
+    private func loadProfile() {
+        guard let suiAddress = UserDefaults.standard.string(forKey: "suiAddress") else {
+            print("⚠️ 未找到 Sui 地址")
+            return
+        }
+        
+        isLoading = true
+        
+        Task {
+            do {
+                let profile = try await APIService.shared.getProfile(suiAddress: suiAddress)
+                
+                await MainActor.run {
+                    self.profileData = profile
+                    self.isLoading = false
+                    
+                    // 如果有头像 URL，加载头像图片
+                    if let avatarUrl = avatarUrl, let url = URL(string: avatarUrl) {
+                        loadAvatarImage(from: url)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    print("❌ 加载用户信息失败: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func loadAvatarImage(from url: URL) {
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.avatarImage = image
+                    }
+                }
+            } catch {
+                print("❌ 加载头像失败: \(error.localizedDescription)")
             }
         }
     }
