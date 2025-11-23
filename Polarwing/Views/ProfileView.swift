@@ -31,7 +31,7 @@ struct ProfileView: View {
                     Image(systemName: "person.circle.fill")
                         .resizable()
                         .frame(width: 80, height: 80)
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
                         .onTapGesture {
                             tapCount += 1
                             if tapCount >= 3 {
@@ -126,7 +126,7 @@ struct P256SignerDebugView: View {
                             .foregroundColor(.gray)
                     }
                     .padding()
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color(red: 172/255, green: 237/255, blue: 228/255).opacity(0.1))
                     .cornerRadius(12)
                     
                     // Public Key (Base64)
@@ -183,7 +183,7 @@ struct P256SignerDebugView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue)
+                            .background(Color(red: 172/255, green: 237/255, blue: 228/255))
                             .foregroundColor(.white)
                             .cornerRadius(10)
                         }
@@ -445,7 +445,7 @@ struct ExportPrivateKeyView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(copied ? Color.green : Color.blue)
+                    .background(copied ? Color.green : Color(red: 172/255, green: 237/255, blue: 228/255))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
@@ -500,7 +500,7 @@ struct ImportPrivateKeyView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(importText.isEmpty ? Color.gray : Color.purple)
+                    .background(importText.isEmpty ? Color.gray : Color(red: 172/255, green: 237/255, blue: 228/255))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
@@ -559,7 +559,7 @@ struct DebugInfoSection: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isCopied ? Color.green : Color.blue)
+                .background(isCopied ? Color.green : Color(red: 172/255, green: 237/255, blue: 228/255))
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }

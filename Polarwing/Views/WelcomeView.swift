@@ -22,7 +22,7 @@ struct WelcomeView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(width: 200, height: 50)
-                    .background(Color.blue)
+                    .background(Color(red: 172/255, green: 237/255, blue: 228/255))
                     .cornerRadius(25)
             }
         }
