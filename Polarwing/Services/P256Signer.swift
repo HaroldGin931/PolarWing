@@ -1,16 +1,16 @@
 //
-//  PasskeyManager.swift
+//  P256Signer.swift
 //  Polarwing
 //
-//  Created on 2025-11-22.
+//  Created on 2025-11-23.
 //
 
 import Foundation
 import CryptoKit
 import Security
 
-class PasskeyManager: NSObject, ObservableObject {
-    static let shared = PasskeyManager()
+class P256Signer: NSObject, ObservableObject {
+    static let shared = P256Signer()
     
     @Published var isAuthenticated = false
     @Published var publicKey: Data?
@@ -65,13 +65,13 @@ class PasskeyManager: NSObject, ObservableObject {
     // 使用私钥对消息签名
     func signMessage(_ message: String, completion: @escaping (Result<SignatureResult, Error>) -> Void) {
         guard let messageData = message.data(using: .utf8) else {
-            completion(.failure(NSError(domain: "PasskeyManager", code: -1, 
+            completion(.failure(NSError(domain: "P256Signer", code: -1, 
                 userInfo: [NSLocalizedDescriptionKey: "Invalid message"])))
             return
         }
         
         guard let privateKey = self.privateKey else {
-            completion(.failure(NSError(domain: "PasskeyManager", code: -1, 
+            completion(.failure(NSError(domain: "P256Signer", code: -1, 
                 userInfo: [NSLocalizedDescriptionKey: "Private key not found. Please generate key pair first."])))
             return
         }
@@ -148,7 +148,7 @@ class PasskeyManager: NSObject, ObservableObject {
     // 导入私钥（用于恢复）
     func importPrivateKey(_ base64String: String, completion: @escaping (Result<Data, Error>) -> Void) {
         guard let privateKeyData = Data(base64Encoded: base64String) else {
-            completion(.failure(NSError(domain: "PasskeyManager", code: -1,
+            completion(.failure(NSError(domain: "P256Signer", code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid private key format"])))
             return
         }
@@ -193,7 +193,7 @@ class PasskeyManager: NSObject, ObservableObject {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         guard status == errSecSuccess else {
-            throw NSError(domain: "PasskeyManager", code: Int(status),
+            throw NSError(domain: "P256Signer", code: Int(status),
                 userInfo: [NSLocalizedDescriptionKey: "Failed to save private key to Keychain: \(status)"])
         }
         
@@ -235,7 +235,8 @@ class PasskeyManager: NSObject, ObservableObject {
     }
 }
 
-// 签名结果
+// MARK: - 签名结果
+
 struct SignatureResult {
     let signature: Data        // ECDSA 签名 (DER 编码)
     let message: Data          // 原始消息
@@ -250,22 +251,23 @@ struct SignatureResult {
         ]
     }
     
-    // 生成 Sui Move 调用示例
-    func toSuiMoveArgs(publicKey: Data) -> String {
+    // 生成区块链验证代码示例
+    func toBlockchainVerificationExample(publicKey: Data) -> String {
         let hex = toHexStrings()
         let pkHex = publicKey.map { String(format: "%02x", $0) }.joined()
         
         return """
-        // Sui Move 验证函数示例:
-        public fun verify_signature(
-            signature: vector<u8>,     // 0x\(hex["signature"]!)
-            message: vector<u8>,        // 0x\(hex["message"]!)
-            public_key: vector<u8>,     // 0x\(pkHex)
-        ): bool {
-            // 使用 Sui 的 secp256r1_verify 验证签名
-            // 签名采用 DER 编码，公钥为 65 字节（0x04 + x + y）
-            sui::crypto::secp256r1_verify(&signature, &public_key, &message)
-        }
+        // P256 (secp256r1) 签名验证示例:
+        
+        签名 (Hex): 0x\(hex["signature"]!)
+        消息 (Hex): 0x\(hex["message"]!)
+        公钥 (Hex): 0x\(pkHex)
+        
+        // 验证说明:
+        // - 算法: ECDSA with P256 (secp256r1)
+        // - 签名格式: DER 编码
+        // - 公钥格式: 65 字节 (0x04 + x-coordinate + y-coordinate)
+        // - 哈希算法: SHA256
         """
     }
 }

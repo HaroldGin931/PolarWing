@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @StateObject private var passkeyManager = PasskeyManager.shared
+    @StateObject private var p256Signer = P256Signer.shared
     @State private var tapCount = 0
     @State private var showDebugView = false
     
@@ -89,19 +89,19 @@ struct ProfileView: View {
             .navigationTitle("我的")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showDebugView) {
-                SecureEnclaveDebugView()
+                P256SignerDebugView()
             }
         }
     }
 }
 
-struct SecureEnclaveDebugView: View {
+struct P256SignerDebugView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var passkeyManager = PasskeyManager.shared
+    @StateObject private var p256Signer = P256Signer.shared
     @State private var copiedItem = ""
     @State private var publicKey = "未设置"
     @State private var publicKeyHex = "未设置"
-    @State private var testMessage = "Hello Sui Blockchain!"
+    @State private var testMessage = "Hello P256 Signature!"
     @State private var lastSignature = "未生成"
     @State private var verificationResult = ""
     @State private var isSigning = false
@@ -117,10 +117,10 @@ struct SecureEnclaveDebugView: View {
                 VStack(spacing: 20) {
                     // 说明文字
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Secure Enclave P256 密钥")
+                        Text("P256 密钥管理")
                             .font(.headline)
                         
-                        Text("私钥安全存储在 Secure Enclave 中，签名需要 Face ID/Touch ID 认证")
+                        Text("私钥安全存储在 Keychain 中，可导出备份")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -210,14 +210,14 @@ struct SecureEnclaveDebugView: View {
                             .cornerRadius(8)
                         }
                         
-                        // 显示 Sui Move 代码
-                        if let result = signatureResult, let pk = passkeyManager.publicKey {
+                        // 显示区块链验证示例
+                        if let result = signatureResult, let pk = p256Signer.publicKey {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Sui Move 验证代码")
+                                Text("区块链验证示例")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 
-                                Text(result.toSuiMoveArgs(publicKey: pk))
+                                Text(result.toBlockchainVerificationExample(publicKey: pk))
                                     .font(.system(.caption2, design: .monospaced))
                                     .padding()
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -280,7 +280,7 @@ struct SecureEnclaveDebugView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Secure Enclave 调试")
+            .navigationTitle("P256 签名器调试")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -302,18 +302,18 @@ struct SecureEnclaveDebugView: View {
     }
     
     private func loadPublicKey() {
-        if let pk = passkeyManager.publicKey ?? passkeyManager.getSavedPublicKey() {
+        if let pk = p256Signer.publicKey ?? p256Signer.getSavedPublicKey() {
             publicKey = pk.base64EncodedString()
             publicKeyHex = pk.map { String(format: "%02x", $0) }.joined()
         }
         
-        print("📱 Secure Enclave 调试信息:")
+        print("📱 P256 Signer 调试信息:")
         print("  - 公钥 (Base64): \(publicKey)")
         print("  - 公钥 (Hex): \(publicKeyHex)")
     }
     
     private func regenerateKeyPair() {
-        passkeyManager.generateKeyPair { result in
+        p256Signer.generateKeyPair { result in
             switch result {
             case .success:
                 print("✅ 密钥对重新生成成功")
@@ -330,7 +330,7 @@ struct SecureEnclaveDebugView: View {
         isSigning = true
         verificationResult = ""
         
-        passkeyManager.signMessage(testMessage) { result in
+        p256Signer.signMessage(testMessage) { result in
             isSigning = false
             
             switch result {
@@ -343,14 +343,14 @@ struct SecureEnclaveDebugView: View {
                 print("  - 签名: \(lastSignature)")
                 
                 // 立即验证签名
-                if let publicKeyData = passkeyManager.publicKey ?? passkeyManager.getSavedPublicKey() {
-                    let isValid = passkeyManager.verifySignature(
+                if let publicKeyData = p256Signer.publicKey ?? p256Signer.getSavedPublicKey() {
+                    let isValid = p256Signer.verifySignature(
                         signature: result.signature,
                         message: result.message,
                         publicKey: publicKeyData
                     )
                     
-                    verificationResult = isValid ? "✅ 签名验证成功！可用于 Sui 链上验证" : "❌ 签名验证失败"
+                    verificationResult = isValid ? "✅ 签名验证成功！可用于区块链验证" : "❌ 签名验证失败"
                 } else {
                     verificationResult = "❌ 无法获取公钥"
                 }
@@ -363,7 +363,7 @@ struct SecureEnclaveDebugView: View {
     }
     
     private func importPrivateKeyAction() {
-        passkeyManager.importPrivateKey(importPrivateKey) { result in
+        p256Signer.importPrivateKey(importPrivateKey) { result in
             switch result {
             case .success:
                 print("✅ 私钥导入成功")
@@ -380,13 +380,13 @@ struct SecureEnclaveDebugView: View {
 // 导出私钥视图
 struct ExportPrivateKeyView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var passkeyManager = PasskeyManager.shared
+    @StateObject private var p256Signer = P256Signer.shared
     @State private var copied = false
     
     let privateKey: String
     
     var actualPrivateKey: String {
-        passkeyManager.exportPrivateKey() ?? "无私钥"
+        p256Signer.exportPrivateKey() ?? "无私钥"
     }
     
     var body: some View {

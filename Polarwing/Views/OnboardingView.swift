@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @StateObject private var passkeyManager = PasskeyManager.shared
+    @StateObject private var p256Signer = P256Signer.shared
     @Binding var isOnboardingComplete: Bool
     
     @State private var username = ""
@@ -79,8 +79,8 @@ struct OnboardingView: View {
         // 保存用户名
         UserDefaults.standard.set(username, forKey: "username")
         
-        // 在 Secure Enclave 中生成密钥对
-        passkeyManager.generateKeyPair { result in
+        // 生成 P256 密钥对
+        p256Signer.generateKeyPair { result in
             isCreatingPasskey = false
             
             switch result {
