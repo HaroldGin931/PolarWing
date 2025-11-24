@@ -483,6 +483,7 @@ struct PostDetailView: View {
             case .success(let signatureResult):
                 Task {
                     do {
+                        let savedCommentText = commentText // 保存评论文本
                         let comment = try await APIService.shared.createComment(
                             postId: post.id,
                             text: commentText,
@@ -496,7 +497,22 @@ struct PostDetailView: View {
                         )
                         
                         await MainActor.run {
-                            self.comments.insert(comment, at: 0)
+                            // 创建包含完整内容的评论对象
+                            var fullComment = comment
+                            // 如果 API 返回的评论没有内容文本，使用本地保存的文本
+                            if fullComment.contentText == nil || fullComment.contentText?.isEmpty == true {
+                                fullComment = CommentResponse(
+                                    id: comment.id,
+                                    postId: comment.postId,
+                                    author: comment.author,
+                                    blobId: comment.blobId,
+                                    contentText: savedCommentText,
+                                    storageType: comment.storageType,
+                                    txDigest: comment.txDigest,
+                                    createdAt: comment.createdAt
+                                )
+                            }
+                            self.comments.insert(fullComment, at: 0)
                             self.commentCount += 1
                             self.commentText = ""
                             self.isPostingComment = false

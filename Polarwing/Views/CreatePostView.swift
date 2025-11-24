@@ -97,9 +97,9 @@ struct CreatePostView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("New Post")
             .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(.dark)
             .toolbarBackground(.black, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -153,7 +153,7 @@ struct CreatePostView: View {
             }
             .alert("Publishing Failed", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
-            } message {
+            } message: {
                 Text(errorMessage)
             }
         }
@@ -352,9 +352,9 @@ struct CreatePostWithImageView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("New Post")
             .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(.dark)
             .toolbarBackground(.black, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
