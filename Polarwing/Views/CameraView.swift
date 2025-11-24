@@ -9,6 +9,7 @@ import SwiftUI
 import AVFoundation
 import UIKit
 import Photos
+import CoreMotion
 
 struct CameraView: View {
     @Environment(\.dismiss) var dismiss
@@ -246,10 +247,71 @@ class CameraManager: NSObject, ObservableObject {
     private var photoOutput = AVCapturePhotoOutput()
     private var currentCamera: AVCaptureDevice?
     private var captureCompletion: ((UIImage?) -> Void)?
+    private let motionManager = CMMotionManager()
+    private var deviceOrientation: UIDeviceOrientation = .portrait
     
     override init() {
         super.init()
         loadLastPhotoThumbnail()
+        startMonitoringDeviceOrientation()
+    }
+    
+    deinit {
+        stopMonitoringDeviceOrientation()
+    }
+    
+    // 开始监听设备方向
+    private func startMonitoringDeviceOrientation() {
+        guard motionManager.isAccelerometerAvailable else {
+            print("⚠️ 加速度计不可用")
+            return
+        }
+        
+        motionManager.accelerometerUpdateInterval = 0.2
+        motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, error in
+            guard let self = self, let data = data else { return }
+            
+            let acceleration = data.acceleration
+            
+            // 根据加速度计数据判断设备方向
+            if abs(acceleration.y) > abs(acceleration.x) {
+                if acceleration.y > 0 {
+                    self.deviceOrientation = .portraitUpsideDown
+                } else {
+                    self.deviceOrientation = .portrait
+                }
+            } else {
+                if acceleration.x > 0 {
+                    self.deviceOrientation = .landscapeRight
+                } else {
+                    self.deviceOrientation = .landscapeLeft
+                }
+            }
+        }
+    }
+    
+    // 停止监听设备方向
+    private func stopMonitoringDeviceOrientation() {
+        motionManager.stopAccelerometerUpdates()
+    }
+    
+    // 获取照片方向
+    private func getPhotoOrientation() -> CGImagePropertyOrientation {
+        // 根据设备方向和相机位置返回正确的照片方向
+        let isUsingFrontCamera = currentCamera?.position == .front
+        
+        switch deviceOrientation {
+        case .portrait:
+            return .right
+        case .portraitUpsideDown:
+            return .left
+        case .landscapeLeft:
+            return isUsingFrontCamera ? .down : .up
+        case .landscapeRight:
+            return isUsingFrontCamera ? .up : .down
+        default:
+            return .right
+        }
     }
     
     private func loadLastPhotoThumbnail() {
@@ -380,7 +442,28 @@ class CameraManager: NSObject, ObservableObject {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = flashMode
         
+        // 设置照片方向信息
+        if let connection = photoOutput.connection(with: .video) {
+            connection.videoOrientation = convertDeviceOrientationToVideoOrientation(deviceOrientation)
+        }
+        
         photoOutput.capturePhoto(with: settings, delegate: self)
+    }
+    
+    // 转换设备方向为视频方向
+    private func convertDeviceOrientationToVideoOrientation(_ orientation: UIDeviceOrientation) -> AVCaptureVideoOrientation {
+        switch orientation {
+        case .portrait:
+            return .portrait
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        case .landscapeLeft:
+            return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
+        default:
+            return .portrait
+        }
     }
 }
 
@@ -392,19 +475,45 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
             return
         }
         
-        guard let imageData = photo.fileDataRepresentation(),
-              let image = UIImage(data: imageData) else {
+        guard let imageData = photo.fileDataRepresentation() else {
             captureCompletion?(nil)
             return
         }
         
-        // 保存到相册
-        savePhotoToLibrary(image: image)
+        // 使用 CGImageSource 读取照片并保留 EXIF 信息
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            captureCompletion?(nil)
+            return
+        }
+        
+        // 创建带正确方向的 UIImage
+        let photoOrientation = getPhotoOrientation()
+        let uiImageOrientation = convertToUIImageOrientation(photoOrientation)
+        let image = UIImage(cgImage: cgImage, scale: 1.0, orientation: uiImageOrientation)
+        
+        // 保存到相册时保留方向信息
+        savePhotoToLibraryWithOrientation(imageData: imageData, orientation: photoOrientation)
         
         captureCompletion?(image)
     }
     
-    private func savePhotoToLibrary(image: UIImage) {
+    // 转换 CGImagePropertyOrientation 为 UIImage.Orientation
+    private func convertToUIImageOrientation(_ cgOrientation: CGImagePropertyOrientation) -> UIImage.Orientation {
+        switch cgOrientation {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        }
+    }
+    
+    // 保存照片到相册并保留方向信息
+    private func savePhotoToLibraryWithOrientation(imageData: Data, orientation: CGImagePropertyOrientation) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 print("⚠️ 没有相册写入权限")
@@ -418,18 +527,28 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
                     return
                 }
                 
+                // 创建带有方向信息的照片数据
+                guard let imageDataWithOrientation = self.createImageDataWithOrientation(imageData: imageData, orientation: orientation) else {
+                    print("❌ 无法创建带方向信息的图片数据")
+                    return
+                }
+                
                 PHPhotoLibrary.shared().performChanges({
-                    let creationRequest = PHAssetCreationRequest.creationRequestForAsset(from: image)
+                    let creationRequest = PHAssetCreationRequest.forAsset()
+                    creationRequest.addResource(with: .photo, data: imageDataWithOrientation, options: nil)
+                    
                     if let assetPlaceholder = creationRequest.placeholderForCreatedAsset,
                        let albumChangeRequest = PHAssetCollectionChangeRequest(for: collection) {
                         albumChangeRequest.addAssets([assetPlaceholder] as NSArray)
                     }
                 }) { success, error in
                     if success {
-                        print("✅ 照片已保存到 Polarwing 相册")
+                        print("✅ 照片已保存到 Polarwing 相册，方向: \(orientation.rawValue)")
                         // 更新缩略图
-                        DispatchQueue.main.async {
-                            self.lastPhotoThumbnail = image
+                        if let image = UIImage(data: imageDataWithOrientation) {
+                            DispatchQueue.main.async {
+                                self.lastPhotoThumbnail = image
+                            }
                         }
                     } else if let error = error {
                         print("❌ 保存到相册失败: \(error.localizedDescription)")
@@ -437,6 +556,38 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
                 }
             }
         }
+    }
+    
+    // 创建带有正确 EXIF 方向信息的图片数据
+    private func createImageDataWithOrientation(imageData: Data, orientation: CGImagePropertyOrientation) -> Data? {
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let uti = CGImageSourceGetType(source) else {
+            return nil
+        }
+        
+        let destinationData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(destinationData, uti, 1, nil) else {
+            return nil
+        }
+        
+        // 复制原始图片的元数据
+        var properties: [String: Any] = [:]
+        if let imageProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
+            properties = imageProperties
+        }
+        
+        // 设置正确的方向
+        properties[kCGImagePropertyOrientation as String] = orientation.rawValue
+        
+        // 添加图片到目标
+        CGImageDestinationAddImageFromSource(destination, source, 0, properties as CFDictionary)
+        
+        // 完成写入
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+        
+        return destinationData as Data
     }
     
     private func getOrCreatePolarwingAlbum(completion: @escaping (PHAssetCollection?) -> Void) {
