@@ -15,7 +15,8 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             Group {
-                if isLoading {
+                if posts.isEmpty && isLoading {
+                    // 只有在首次加载且没有数据时才显示加载状态
                     VStack {
                         ProgressView()
                             .padding()
@@ -23,7 +24,8 @@ struct HomeView: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
-                } else if let error = errorMessage {
+                } else if posts.isEmpty && !isLoading && errorMessage != nil {
+                    // 只有在没有数据且加载失败时才显示错误
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 60))
@@ -31,7 +33,7 @@ struct HomeView: View {
                         Text("加载失败")
                             .font(.headline)
                             .foregroundColor(.gray)
-                        Text(error)
+                        Text(errorMessage!)
                             .font(.caption)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -55,6 +57,7 @@ struct HomeView: View {
                             .foregroundColor(.gray)
                     }
                 } else {
+                    // 有数据时显示内容,即使正在刷新也保持显示
                     PostGridView(posts: posts, showUsername: true)
                 }
             }
@@ -78,6 +81,12 @@ struct HomeView: View {
     }
     
     private func loadPosts() {
+        // 先加载缓存的帖子
+        if let cachedPosts = CacheManager.shared.loadPosts() {
+            self.posts = cachedPosts
+            print("✅ 加载了 \(cachedPosts.count) 个缓存帖子")
+        }
+        
         // 获取当前用户地址（如果有的话）
         let suiAddress = UserDefaults.standard.string(forKey: "suiAddress") ?? ""
         
@@ -123,7 +132,10 @@ struct HomeView: View {
                 await MainActor.run {
                     self.posts = allPosts
                     self.isLoading = false
-                    print("✅ 成功加载 \(allPosts.count) 个帖子")
+                    
+                    // 缓存新获取的帖子
+                    CacheManager.shared.savePosts(allPosts)
+                    print("✅ 成功加载并缓存 \(allPosts.count) 个帖子")
                 }
             } catch {
                 await MainActor.run {

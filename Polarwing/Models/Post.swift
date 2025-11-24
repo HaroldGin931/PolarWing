@@ -30,10 +30,17 @@ struct Post: Identifiable, Codable {
     var content: String?
     var mediaUrls: [String]?
     
+    // Author profile info (populated separately)
+    var authorNickname: String?
+    var authorAvatarUrl: String?
+    
     // UI helper properties
     var userId: String { author }
     var username: String { 
-        // Extract short address for display
+        // Use nickname if available, otherwise show short address
+        if let nickname = authorNickname, !nickname.isEmpty, nickname != "TBD" {
+            return nickname
+        }
         let prefix = author.prefix(6)
         let suffix = author.suffix(4)
         return "\(prefix)...\(suffix)"
@@ -82,7 +89,9 @@ struct Post: Identifiable, Codable {
          contentMediaUrls: [String]? = nil,
          title: String? = nil,
          content: String? = nil,
-         mediaUrls: [String]? = nil) {
+         mediaUrls: [String]? = nil,
+         authorNickname: String? = nil,
+         authorAvatarUrl: String? = nil) {
         self.id = id
         self.author = author
         self.blobId = blobId
@@ -100,5 +109,7 @@ struct Post: Identifiable, Codable {
         self.title = title
         self.content = content
         self.mediaUrls = mediaUrls
+        self.authorNickname = authorNickname
+        self.authorAvatarUrl = authorAvatarUrl
     }
 }

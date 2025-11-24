@@ -106,7 +106,8 @@ struct ProfileView: View {
                 Divider()
                 
                 // 用户的帖子网格
-                if isLoadingPosts {
+                if userPosts.isEmpty && isLoadingPosts {
+                    // 只有在首次加载且没有数据时才显示加载状态
                     VStack {
                         ProgressView()
                             .padding()
@@ -126,6 +127,7 @@ struct ProfileView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
+                    // 有数据时显示内容,即使正在刷新也保持显示
                     PostGridView(posts: userPosts, showUsername: false)
                 }
             }
@@ -143,14 +145,7 @@ struct ProfileView: View {
                     .disabled(isLoading || isLoadingPosts)
                 }
             }
-            .overlay {
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.2))
-                }
-            }
+
             .sheet(isPresented: $showDebugView) {
                 P256SignerDebugView()
             }
@@ -192,12 +187,22 @@ struct ProfileView: View {
     }
     
     private func loadAvatarImage(from url: URL) {
+        let urlString = url.absoluteString
+        
+        // 先尝试从缓存加载
+        if let cachedImage = CacheManager.shared.loadImage(for: urlString) {
+            self.avatarImage = cachedImage
+            return
+        }
+        
         Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 if let image = UIImage(data: data) {
                     await MainActor.run {
                         self.avatarImage = image
+                        // 缓存头像
+                        CacheManager.shared.saveImage(image, for: urlString)
                     }
                 }
             } catch {
@@ -210,6 +215,15 @@ struct ProfileView: View {
         guard let suiAddress = UserDefaults.standard.string(forKey: "suiAddress") else {
             print("⚠️ 未找到 Sui 地址")
             return
+        }
+        
+        // 先尝试从缓存加载用户的帖子
+        if let cachedPosts = CacheManager.shared.loadPosts() {
+            let myPosts = cachedPosts.filter { $0.author == suiAddress }
+            if !myPosts.isEmpty {
+                self.userPosts = myPosts
+                print("✅ 加载了 \(myPosts.count) 个缓存的用户帖子")
+            }
         }
         
         isLoadingPosts = true

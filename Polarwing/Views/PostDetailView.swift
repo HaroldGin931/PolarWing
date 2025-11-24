@@ -11,6 +11,8 @@ struct PostDetailView: View {
     let post: Post
     @State private var postImage: UIImage?
     @State private var isLoadingImage = false
+    @State private var authorProfile: ProfileResponse?
+    @State private var authorAvatarImage: UIImage?
     
     var displayTitle: String {
         post.title ?? post.contentTitle ?? "无标题"
@@ -18,6 +20,16 @@ struct PostDetailView: View {
     
     var displayContent: String {
         post.content ?? post.contentText ?? ""
+    }
+    
+    var displayUsername: String {
+        if let profile = authorProfile {
+            let nickname = profile.nickname
+            if !nickname.isEmpty && nickname != "TBD" {
+                return nickname
+            }
+        }
+        return post.username
     }
     
     var body: some View {
@@ -48,13 +60,22 @@ struct PostDetailView: View {
                 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Image(systemName: post.userAvatar)
-                            .resizable()
-                            .frame(width: 40, height: 40)
-                            .foregroundColor(.blue)
+                        // 显示用户头像
+                        if let avatarImage = authorAvatarImage {
+                            Image(uiImage: avatarImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: post.userAvatar)
+                                .resizable()
+                                .frame(width: 40, height: 40)
+                                .foregroundColor(.blue)
+                        }
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(post.username)
+                            Text(displayUsername)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                             
@@ -101,6 +122,57 @@ struct PostDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             loadPostImage()
+            loadAuthorProfile()
+        }
+    }
+    
+    private func loadAuthorProfile() {
+        // 如果已经有作者信息，跳过
+        if authorProfile != nil {
+            return
+        }
+        
+        // 先尝试从缓存加载
+        if let cachedProfile = CacheManager.shared.loadProfile(for: post.author) {
+            self.authorProfile = cachedProfile
+            
+            // 尝试从缓存加载头像
+            let avatarUrl = cachedProfile.avatarUrl
+            if avatarUrl != "TBD" && !avatarUrl.isEmpty {
+                if let cachedImage = CacheManager.shared.loadImage(for: avatarUrl) {
+                    self.authorAvatarImage = cachedImage
+                    return // 缓存命中，直接返回
+                }
+            }
+        }
+        
+        Task {
+            do {
+                let profile = try await APIService.shared.getProfile(suiAddress: post.author)
+                
+                await MainActor.run {
+                    self.authorProfile = profile
+                    // 缓存用户资料
+                    CacheManager.shared.saveProfile(profile, for: post.author)
+                }
+                
+                // 加载头像图片
+                let avatarUrl = profile.avatarUrl
+                if avatarUrl != "TBD" && !avatarUrl.isEmpty,
+                   let url = URL(string: avatarUrl) {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    if let image = UIImage(data: data) {
+                        await MainActor.run {
+                            self.authorAvatarImage = image
+                            // 缓存头像图片
+                            CacheManager.shared.saveImage(image, for: avatarUrl)
+                        }
+                    }
+                }
+            } catch {
+                // 静默失败，使用默认显示
+                print("⚠️ 获取作者信息失败 (\(post.author)): \(error.localizedDescription)")
+            }
         }
     }
     
@@ -114,6 +186,12 @@ struct PostDetailView: View {
         
         // 只加载远程图片
         if urlString.hasPrefix("http://") || urlString.hasPrefix("https://") {
+            // 先尝试从缓存加载
+            if let cachedImage = CacheManager.shared.loadImage(for: urlString) {
+                self.postImage = cachedImage
+                return
+            }
+            
             isLoadingImage = true
             
             Task {
@@ -123,6 +201,8 @@ struct PostDetailView: View {
                         await MainActor.run {
                             self.postImage = image
                             self.isLoadingImage = false
+                            // 缓存图片
+                            CacheManager.shared.saveImage(image, for: urlString)
                         }
                     } else {
                         await MainActor.run {
