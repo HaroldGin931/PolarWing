@@ -26,5 +26,7 @@ struct WelcomeView: View {
                     .cornerRadius(25)
             }
         }
+        .background(Color.black.ignoresSafeArea())
+        .preferredColorScheme(.dark)
     }
 }

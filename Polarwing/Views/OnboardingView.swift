@@ -90,6 +90,8 @@ struct OnboardingView: View {
             
             Spacer()
         }
+        .background(Color.black.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $selectedAvatar)
         }

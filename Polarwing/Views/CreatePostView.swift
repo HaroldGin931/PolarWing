@@ -94,8 +94,12 @@ struct CreatePostView: View {
                 }
             }
             .padding()
+            .background(Color.black.ignoresSafeArea())
             .navigationTitle("发帖")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") {
@@ -350,8 +354,12 @@ struct PhotoGalleryPickerView: View {
                     }
                 }
             }
+            .background(Color.black.ignoresSafeArea())
             .navigationTitle("选择照片")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {

@@ -131,8 +131,12 @@ struct ProfileView: View {
                     PostGridView(posts: userPosts, showUsername: false)
                 }
             }
+            .background(Color.black.ignoresSafeArea())
             .navigationTitle("我的")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {

@@ -21,6 +21,8 @@ struct MainTabView: View {
                     Image(systemName: "safari")
                     Text("Explore")
                 }
+                .toolbarBackground(.black, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
             
             // Camera
             CameraTabView(onDismiss: {
@@ -47,8 +49,12 @@ struct MainTabView: View {
                     Image(systemName: "person.fill")
                     Text("Me")
                 }
+                .toolbarBackground(.black, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
         }
         .tint(Color(red: 172/255, green: 237/255, blue: 228/255))
+        .toolbarBackground(.black, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .onChange(of: selectedTab) { oldValue, newValue in
             if newValue == 2 {
                 // 点击 New Post 时显示 sheet

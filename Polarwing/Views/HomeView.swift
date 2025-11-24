@@ -61,8 +61,12 @@ struct HomeView: View {
                     PostGridView(posts: posts, showUsername: true)
                 }
             }
+            .background(Color.black.ignoresSafeArea())
             .navigationTitle("Polarwing")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: loadPosts) {

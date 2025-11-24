@@ -14,6 +14,10 @@ struct PostDetailView: View {
     @State private var authorProfile: ProfileResponse?
     @State private var authorAvatarImage: UIImage?
     
+    // 隐藏的测试功能
+    @State private var avatarTapCount = 0
+    @State private var showDebugInfo = false
+    
     var displayTitle: String {
         post.title ?? post.contentTitle ?? "无标题"
     }
@@ -61,17 +65,33 @@ struct PostDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         // 显示用户头像
-                        if let avatarImage = authorAvatarImage {
-                            Image(uiImage: avatarImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: post.userAvatar)
-                                .resizable()
-                                .frame(width: 40, height: 40)
-                                .foregroundColor(.blue)
+                        Group {
+                            if let avatarImage = authorAvatarImage {
+                                Image(uiImage: avatarImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                            } else {
+                                Image(systemName: post.userAvatar)
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .onTapGesture {
+                            avatarTapCount += 1
+                            if avatarTapCount >= 3 {
+                                showDebugInfo = true
+                                avatarTapCount = 0
+                            }
+                            
+                            // 2秒后重置计数
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                if avatarTapCount > 0 {
+                                    avatarTapCount = 0
+                                }
+                            }
                         }
                         
                         VStack(alignment: .leading, spacing: 2) {
@@ -119,10 +139,33 @@ struct PostDetailView: View {
                 .padding(.horizontal)
             }
         }
+        .background(Color.black.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.black, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .preferredColorScheme(.dark)
         .onAppear {
             loadPostImage()
             loadAuthorProfile()
+        }
+        .alert("🔍 调试信息", isPresented: $showDebugInfo) {
+            Button("复制帖子ID", role: .none) {
+                UIPasteboard.general.string = post.id
+            }
+            Button("复制用户地址", role: .none) {
+                UIPasteboard.general.string = post.author
+            }
+            Button("关闭", role: .cancel) {}
+        } message: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("📝 帖子ID:\n\(post.id)")
+                Text("\n👤 用户地址:\n\(post.author)")
+                Text("\n🔤 用户名:\n\(post.username)")
+                Text("\n📅 创建时间:\n\(post.createdAt)")
+                if let mediaUrls = post.mediaUrls ?? post.contentMediaUrls, !mediaUrls.isEmpty {
+                    Text("\n🖼️ 媒体URL:\n\(mediaUrls.joined(separator: "\n"))")
+                }
+            }
         }
     }
     

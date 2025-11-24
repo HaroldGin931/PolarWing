@@ -50,8 +50,12 @@ struct PhotoGalleryView: View {
                     }
                 }
             }
+            .background(Color.black.ignoresSafeArea())
             .navigationTitle("相册")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
