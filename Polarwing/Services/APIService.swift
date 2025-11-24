@@ -795,6 +795,216 @@ class APIService {
             )
         }
     }
+    
+    // MARK: - Comments API
+    func getComments(
+        postId: String,
+        page: Int = 1,
+        pageSize: Int = 20,
+        includeContent: Bool = true,
+        suiAddress: String
+    ) async throws -> CommentsPageResponse {
+        var components = URLComponents(string: "\(baseURL)/posts/\(postId)/comments")!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "page_size", value: "\(pageSize)"),
+            URLQueryItem(name: "include_content", value: "\(includeContent)")
+        ]
+        
+        guard let url = components.url else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        // Headers
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        
+        print("📤 获取评论列表: \(url.absoluteString)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 200:
+            let decoder = JSONDecoder()
+            let commentsPage = try decoder.decode(CommentsPageResponse.self, from: data)
+            print("✅ 成功获取评论列表: \(commentsPage.comments.count) 条评论")
+            return commentsPage
+            
+        case 400, 401, 403, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
+    
+    func createComment(
+        postId: String,
+        text: String,
+        storageType: String = "walrus",
+        suiAddress: String,
+        publicKey: String,
+        signature: String,
+        action: String = "comment",
+        timestamp: Int,
+        nonce: Int
+    ) async throws -> CommentResponse {
+        let url = URL(string: "\(baseURL)/posts/\(postId)/comments")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        // Headers
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        request.setValue(publicKey, forHTTPHeaderField: "X-Sui-Public-Key")
+        request.setValue(signature, forHTTPHeaderField: "X-Sui-Signature")
+        request.setValue(action, forHTTPHeaderField: "X-Sui-Action")
+        request.setValue("\(timestamp)", forHTTPHeaderField: "X-Sui-Timestamp")
+        request.setValue("\(nonce)", forHTTPHeaderField: "X-Sui-Nonce")
+        
+        // Body
+        let commentContent = CommentContent(text: text)
+        let body = CreateCommentRequest(
+            content: commentContent,
+            storageType: storageType
+        )
+        
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        print("📤 发表评论: \(url.absoluteString)")
+        if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
+            print("📦 请求体: \(bodyString)")
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 201:
+            let decoder = JSONDecoder()
+            let comment = try decoder.decode(CommentResponse.self, from: data)
+            print("✅ 成功发表评论: \(comment.id)")
+            return comment
+            
+        case 400, 401, 403, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
+    
+    func getCommentContent(
+        commentId: String,
+        suiAddress: String
+    ) async throws -> CommentContentResponse {
+        let url = URL(string: "\(baseURL)/comments/\(commentId)/content")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        // Headers
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue(suiAddress, forHTTPHeaderField: "X-Sui-Address")
+        
+        print("📤 获取评论内容: \(url.absoluteString)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "APIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        print("📥 收到响应 - 状态码: \(httpResponse.statusCode)")
+        
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 响应体: \(responseString)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 200:
+            let decoder = JSONDecoder()
+            let commentContent = try decoder.decode(CommentContentResponse.self, from: data)
+            print("✅ 成功获取评论内容")
+            return commentContent
+            
+        case 400, 401, 403, 500:
+            let decoder = JSONDecoder()
+            let apiError = try decoder.decode(APIError.self, from: data)
+            print("❌ API 错误: \(apiError)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [
+                    NSLocalizedDescriptionKey: apiError.message,
+                    "code": apiError.code.rawValue,
+                    "details": apiError.details ?? ""
+                ]
+            )
+            
+        default:
+            print("⚠️ 未预期的状态码: \(httpResponse.statusCode)")
+            throw NSError(
+                domain: "APIService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected status code: \(httpResponse.statusCode)"]
+            )
+        }
+    }
 }
 
 // MARK: - Like Count Response
@@ -804,6 +1014,61 @@ struct LikeCountResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case likeCount = "like_count"
     }
+}
+
+// MARK: - Comment Models
+struct CommentResponse: Codable {
+    let id: String
+    let postId: String
+    let author: String
+    let blobId: String?
+    let contentText: String?
+    let storageType: String
+    let txDigest: String?
+    let createdAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case postId = "post_id"
+        case author
+        case blobId = "blob_id"
+        case contentText = "content_text"
+        case storageType = "storage_type"
+        case txDigest = "tx_digest"
+        case createdAt = "created_at"
+    }
+}
+
+struct CommentContent: Codable {
+    let text: String
+}
+
+struct CreateCommentRequest: Codable {
+    let content: CommentContent
+    let storageType: String
+    
+    enum CodingKeys: String, CodingKey {
+        case content
+        case storageType = "storage_type"
+    }
+}
+
+struct CommentsPageResponse: Codable {
+    let comments: [CommentResponse]
+    let total: Int
+    let page: Int
+    let pageSize: Int
+    let hasMore: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case comments, total, page
+        case pageSize = "page_size"
+        case hasMore = "has_more"
+    }
+}
+
+struct CommentContentResponse: Codable {
+    let text: String
 }
 
 // MARK: - Posts Page Response
