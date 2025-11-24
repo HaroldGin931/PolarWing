@@ -108,38 +108,72 @@ struct HomeView: View {
                     suiAddress: suiAddress
                 )
                 
-                // 获取每个帖子的详细内容
-                var allPosts = postsPage.posts
+                await MainActor.run {
+                    self.isLoading = false
+                }
                 
-                for i in 0..<allPosts.count {
-                    // 如果帖子是 Walrus 存储且没有 contentTitle，则获取详细内容
-                    if allPosts[i].storageType == "walrus" && allPosts[i].contentTitle == nil {
+                // 用于存储已完全加载好的帖子（包括内容和图片）
+                var loadedPosts: [Post] = []
+                
+                // 逐个获取帖子的详细内容和图片，下载好一个显示一个
+                for var post in postsPage.posts {
+                    // 如果帖子是 Walrus 存储，且缺少完整内容（没有标题或没有图片URL），则获取详细内容
+                    let needsContent = post.storageType == "walrus" && 
+                                      (post.contentTitle == nil || post.contentMediaUrls == nil || post.contentMediaUrls?.isEmpty == true)
+                    
+                    if needsContent {
                         do {
                             let content = try await APIService.shared.getPostContent(
-                                postId: allPosts[i].id,
+                                postId: post.id,
                                 suiAddress: suiAddress
                             )
                             
                             // 更新帖子内容
-                            allPosts[i].title = content.title
-                            allPosts[i].content = content.content
-                            allPosts[i].mediaUrls = content.mediaUrls
+                            post.title = content.title
+                            post.content = content.content
+                            post.mediaUrls = content.mediaUrls
                             
-                            print("✅ 获取帖子 \(allPosts[i].id) 的内容: \(content.title)")
+                            print("✅ 获取帖子 \(post.id) 的内容: \(content.title), 图片数: \(content.mediaUrls.count)")
                         } catch {
-                            print("⚠️ 获取帖子 \(allPosts[i].id) 内容失败: \(error.localizedDescription)")
-                            // 继续处理其他帖子
+                            print("⚠️ 获取帖子 \(post.id) 内容失败: \(error.localizedDescription)")
+                            // 内容获取失败，跳过这个帖子
+                            continue
                         }
+                    }
+                    
+                    // 如果帖子有图片，预下载图片
+                    let mediaUrls = post.mediaUrls ?? post.contentMediaUrls
+                    if let urlString = mediaUrls?.first,
+                       (urlString.hasPrefix("http://") || urlString.hasPrefix("https://")),
+                       let imageUrl = URL(string: urlString) {
+                        
+                        // 检查缓存
+                        if CacheManager.shared.loadImage(for: urlString) == nil {
+                            do {
+                                let (data, _) = try await URLSession.shared.data(from: imageUrl)
+                                if let image = UIImage(data: data) {
+                                    // 缓存图片
+                                    CacheManager.shared.saveImage(image, for: urlString)
+                                    print("✅ 下载帖子 \(post.id) 的图片")
+                                }
+                            } catch {
+                                print("⚠️ 下载帖子 \(post.id) 的图片失败: \(error.localizedDescription)")
+                                // 图片下载失败也显示帖子，只是会显示占位符
+                            }
+                        }
+                    }
+                    
+                    // 将下载好内容和图片的帖子添加到列表并立即显示
+                    loadedPosts.append(post)
+                    await MainActor.run {
+                        self.posts = loadedPosts
                     }
                 }
                 
+                // 全部下载完成后缓存
                 await MainActor.run {
-                    self.posts = allPosts
-                    self.isLoading = false
-                    
-                    // 缓存新获取的帖子
-                    CacheManager.shared.savePosts(allPosts)
-                    print("✅ 成功加载并缓存 \(allPosts.count) 个帖子")
+                    CacheManager.shared.savePosts(loadedPosts)
+                    print("✅ 成功加载并缓存 \(loadedPosts.count) 个帖子")
                 }
             } catch {
                 await MainActor.run {

@@ -259,7 +259,7 @@ struct ImagePreviewView: View {
                         VStack {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.title2)
-                            Text("重拍")
+                            Text("Retake")
                                 .font(.caption)
                         }
                         .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
@@ -269,7 +269,7 @@ struct ImagePreviewView: View {
                         VStack {
                             Image(systemName: "checkmark")
                                 .font(.title2)
-                            Text("使用")
+                            Text("Confrim")
                                 .font(.caption)
                         }
                         .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))

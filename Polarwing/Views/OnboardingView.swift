@@ -272,6 +272,10 @@ struct OnboardingView: View {
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
             }
+            .onTapGesture {
+                // 点击空白处关闭键盘
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
             
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -279,14 +283,19 @@ struct OnboardingView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                     
-                    TextEditor(text: $privateKeyInput)
+                    TextField("Paste your private key here", text: $privateKeyInput)
+                        .textFieldStyle(.plain)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.white)
-                        .scrollContentBackground(.hidden)
                         .padding(12)
-                        .frame(height: 150)
+                        .frame(height: 50)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(12)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .submitLabel(.done)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -305,6 +314,10 @@ struct OnboardingView: View {
                 .padding()
                 .background(Color.orange.opacity(0.1))
                 .cornerRadius(12)
+                .onTapGesture {
+                    // 点击空白处关闭键盘
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
                 
                 Button(action: importExistingUserAccount) {
                     HStack {
