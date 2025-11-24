@@ -18,7 +18,7 @@ struct WelcomeView: View {
             Button(action: {
                 showWelcome = false
             }) {
-                Text("进入")
+                Text("Enter")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(width: 200, height: 50)

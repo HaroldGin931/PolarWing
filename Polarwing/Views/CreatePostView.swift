@@ -34,16 +34,16 @@ struct CreatePostView: View {
                                 .frame(maxHeight: 300)
                                 .cornerRadius(12)
                             
-                            // 标题输入框
-                            TextField("标题", text: $postTitle)
+                            // Title input field
+                            TextField("Title", text: $postTitle)
                                 .textFieldStyle(.plain)
                                 .font(.headline)
                                 .padding()
                                 .background(Color.gray.opacity(0.1))
                                 .cornerRadius(12)
                             
-                            // 内容输入框
-                            TextField("添加图片说明...", text: $caption, axis: .vertical)
+                            // Caption input field
+                            TextField("Add caption...", text: $caption, axis: .vertical)
                                 .textFieldStyle(.plain)
                                 .padding()
                                 .background(Color.gray.opacity(0.1))
@@ -62,7 +62,7 @@ struct CreatePostView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "camera.fill")
                                     .font(.system(size: 50))
-                                Text("拍照")
+                                Text("Take Photo")
                                     .font(.headline)
                             }
                             .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
@@ -78,7 +78,7 @@ struct CreatePostView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "photo.on.rectangle")
                                     .font(.system(size: 50))
-                                Text("从相册选择")
+                                Text("Choose from Gallery")
                                     .font(.headline)
                             }
                             .foregroundColor(Color(red: 172/255, green: 237/255, blue: 228/255))
@@ -114,7 +114,7 @@ struct CreatePostView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                             } else {
-                                Text("发布")
+                                Text("Post")
                                     .fontWeight(.semibold)
                             }
                         }
@@ -572,10 +572,10 @@ struct PhotoGalleryPickerView: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 60))
                             .foregroundColor(.gray.opacity(0.5))
-                        Text("没有照片")
+                        Text("No Photos")
                             .font(.headline)
                             .foregroundColor(.gray)
-                        Text("请先使用相机拍摄照片")
+                        Text("Please take photos using the camera first")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -598,7 +598,7 @@ struct PhotoGalleryPickerView: View {
                 }
             }
             .background(Color.black.ignoresSafeArea())
-            .navigationTitle("选择照片")
+            .navigationTitle("Select Photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.black, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)

@@ -18,7 +18,7 @@ struct ProfileView: View {
     @State private var isLoadingPosts = false
     
     var username: String {
-        profileData?.nickname ?? UserDefaults.standard.string(forKey: "username") ?? "用户"
+        profileData?.nickname ?? UserDefaults.standard.string(forKey: "username") ?? "User"
     }
     
     var bio: String {
@@ -86,7 +86,7 @@ struct ProfileView: View {
                             Text("\(userPosts.count)")
                                 .font(.headline)
                                 .fontWeight(.bold)
-                            Text("帖子")
+                            Text("Posts")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -95,7 +95,7 @@ struct ProfileView: View {
                             Text("\(userPosts.reduce(0) { $0 + $1.likes })")
                                 .font(.headline)
                                 .fontWeight(.bold)
-                            Text("获赞")
+                            Text("Likes")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -111,7 +111,7 @@ struct ProfileView: View {
                     VStack {
                         ProgressView()
                             .padding()
-                        Text("加载帖子中...")
+                        Text("Loading posts...")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -121,7 +121,7 @@ struct ProfileView: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 60))
                             .foregroundColor(.gray.opacity(0.5))
-                        Text("还没有发布帖子")
+                        Text("No posts yet")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
@@ -132,7 +132,7 @@ struct ProfileView: View {
                 }
             }
             .background(Color.black.ignoresSafeArea())
-            .navigationTitle("我的")
+            .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.black, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -288,11 +288,11 @@ struct P256SignerDebugView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var p256Signer = P256Signer.shared
     @State private var copiedItem = ""
-    @State private var publicKey = "未设置"
-    @State private var publicKeyHex = "未设置"
-    @State private var suiAddress = "未生成"
+    @State private var publicKey = "Not set"
+    @State private var publicKeyHex = "Not set"
+    @State private var suiAddress = "Not generated"
     @State private var testMessage = "Hello P256 Signature!"
-    @State private var lastSignature = "未生成"
+    @State private var lastSignature = "Not generated"
     @State private var verificationResult = ""
     @State private var isSigning = false
     @State private var signatureResult: SignatureResult?
@@ -307,10 +307,10 @@ struct P256SignerDebugView: View {
                 VStack(spacing: 20) {
                     // 说明文字
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("P256 密钥管理")
+                        Text("P256 Key Management")
                             .font(.headline)
                         
-                        Text("私钥安全存储在 Keychain 中，可导出备份")
+                        Text("Private key is securely stored in Keychain and can be exported for backup")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -320,21 +320,21 @@ struct P256SignerDebugView: View {
                     
                     // Public Key (Base64)
                     DebugInfoSection(
-                        title: "P256 公钥 (Base64)",
+                        title: "P256 Public Key (Base64)",
                         content: publicKey,
                         copiedItem: $copiedItem
                     )
                     
                     // Public Key (Hex)
                     DebugInfoSection(
-                        title: "P256 公钥 (Hex)",
+                        title: "P256 Public Key (Hex)",
                         content: publicKeyHex,
                         copiedItem: $copiedItem
                     )
                     
                     // Sui Address
                     DebugInfoSection(
-                        title: "Sui 地址",
+                        title: "Sui Address",
                         content: suiAddress,
                         copiedItem: $copiedItem
                     )
@@ -344,16 +344,16 @@ struct P256SignerDebugView: View {
                     
                     // 签名测试部分
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("签名测试")
+                        Text("Signature Test")
                             .font(.title3)
                             .fontWeight(.bold)
                         
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("测试消息")
+                            Text("Test Message")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             
-                            TextField("输入要签名的消息", text: $testMessage)
+                            TextField("Enter message to sign", text: $testMessage)
                                 .textFieldStyle(.plain)
                                 .padding()
                                 .background(Color.gray.opacity(0.1))
@@ -367,7 +367,7 @@ struct P256SignerDebugView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
                                     Image(systemName: "signature")
-                                    Text("生成签名")
+                                    Text("Generate Signature")
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -378,9 +378,9 @@ struct P256SignerDebugView: View {
                         }
                         .disabled(isSigning || testMessage.isEmpty)
                         
-                        if lastSignature != "未生成" {
+                        if lastSignature != "Not generated" {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("签名结果 (Base64)")
+                                Text("Signature Result (Base64)")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 
@@ -407,10 +407,10 @@ struct P256SignerDebugView: View {
                             .cornerRadius(8)
                         }
                         
-                        // 显示区块链验证示例
+                        // Show blockchain verification example
                         if let result = signatureResult, let pk = p256Signer.publicKey {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("区块链验证示例")
+                                Text("Blockchain Verification Example")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 
@@ -430,16 +430,16 @@ struct P256SignerDebugView: View {
                     
                     // 密钥管理部分
                     VStack(spacing: 12) {
-                        Text("密钥管理")
+                        Text("Key Management")
                             .font(.title3)
                             .fontWeight(.bold)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        // 导出私钥
+                        // Export private key
                         Button(action: { showExportSheet = true }) {
                             HStack {
                                 Image(systemName: "square.and.arrow.up")
-                                Text("导出私钥")
+                                Text("Export Private Key")
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -448,11 +448,11 @@ struct P256SignerDebugView: View {
                             .cornerRadius(10)
                         }
                         
-                        // 导入私钥
+                        // Import private key
                         Button(action: { showImportSheet = true }) {
                             HStack {
                                 Image(systemName: "square.and.arrow.down")
-                                Text("导入私钥")
+                                Text("Import Private Key")
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -461,11 +461,11 @@ struct P256SignerDebugView: View {
                             .cornerRadius(10)
                         }
                         
-                        // 重新生成密钥对
+                        // Regenerate key pair
                         Button(action: regenerateKeyPair) {
                             HStack {
                                 Image(systemName: "arrow.clockwise")
-                                Text("重新生成密钥对")
+                                Text("Regenerate Key Pair")
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -477,11 +477,11 @@ struct P256SignerDebugView: View {
                 }
                 .padding()
             }
-            .navigationTitle("P256 签名器调试")
+            .navigationTitle("P256 Signer Debug")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -609,7 +609,7 @@ struct ExportPrivateKeyView: View {
                 .cornerRadius(12)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("私钥 (Base64)")
+                    Text("Private Key (Base64)")
                         .font(.headline)
                     
                     Text(actualPrivateKey)
@@ -630,7 +630,7 @@ struct ExportPrivateKeyView: View {
                 }) {
                     HStack {
                         Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                        Text(copied ? "已复制" : "复制私钥")
+                        Text(copied ? "Copied" : "Copy Private Key")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -642,11 +642,11 @@ struct ExportPrivateKeyView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("导出私钥")
+            .navigationTitle("Export Private Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -665,10 +665,10 @@ struct ImportPrivateKeyView: View {
         NavigationView {
             VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("导入说明")
+                    Text("Import Instructions")
                         .font(.headline)
                     
-                    Text("粘贴之前导出的私钥 (Base64 格式)")
+                    Text("Paste the previously exported private key (Base64 format)")
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -685,7 +685,7 @@ struct ImportPrivateKeyView: View {
                 }) {
                     HStack {
                         Image(systemName: "square.and.arrow.down")
-                        Text("导入")
+                        Text("Import")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -698,11 +698,11 @@ struct ImportPrivateKeyView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("导入私钥")
+            .navigationTitle("Import Private Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -744,7 +744,7 @@ struct DebugInfoSection: View {
             }) {
                 HStack {
                     Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                    Text(isCopied ? "已复制" : "复制")
+                    Text(isCopied ? "Copied" : "Copy")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()

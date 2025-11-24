@@ -68,14 +68,14 @@ struct MainTabView: View {
                 previousTab = newValue
             }
         }
-        .confirmationDialog("选择发帖方式", isPresented: $showCreatePostMenu, titleVisibility: .visible) {
-            Button("拍摄") {
+        .confirmationDialog("Choose Post Method", isPresented: $showCreatePostMenu, titleVisibility: .visible) {
+            Button("Take Photo") {
                 showCamera = true
             }
-            Button("从相册选择") {
+            Button("Choose from Gallery") {
                 showPhotoGallery = true
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraView(onImageCaptured: { image in

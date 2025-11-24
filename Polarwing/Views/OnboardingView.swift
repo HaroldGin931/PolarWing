@@ -46,20 +46,20 @@ struct OnboardingView: View {
                     }
                 }
                 
-                Text(selectedAvatar == nil ? "点击上传头像" : "点击更换头像")
+                Text(selectedAvatar == nil ? "Tap to upload avatar" : "Tap to change avatar")
                     .font(.caption)
                     .foregroundColor(.gray)
                 
-                Text("欢迎来到 Polarwing")
+                Text("Welcome to Polarwing")
                     .font(.system(size: 32, weight: .bold))
                 
-                Text("设置你的用户名开始使用")
+                Text("Set your username to get started")
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
             
             VStack(spacing: 20) {
-                TextField("输入用户名", text: $username)
+                TextField("Enter username", text: $username)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .padding()
@@ -74,7 +74,7 @@ struct OnboardingView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
-                            Text("开始使用")
+                            Text("Get Started")
                         }
                     }
                     .font(.headline)
@@ -95,8 +95,8 @@ struct OnboardingView: View {
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $selectedAvatar)
         }
-        .alert("设置失败", isPresented: $showError) {
-            Button("重试", role: .cancel) {}
+        .alert("Setup Failed", isPresented: $showError) {
+            Button("Retry", role: .cancel) {}
         } message: {
             Text(errorMessage)
         }

@@ -20,7 +20,7 @@ struct HomeView: View {
                     VStack {
                         ProgressView()
                             .padding()
-                        Text("加载帖子中...")
+                        Text("Loading posts...")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -30,7 +30,7 @@ struct HomeView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 60))
                             .foregroundColor(.gray.opacity(0.5))
-                        Text("加载失败")
+                        Text("Loading Failed")
                             .font(.headline)
                             .foregroundColor(.gray)
                         Text(errorMessage!)
@@ -38,7 +38,7 @@ struct HomeView: View {
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
-                        Button("重试") {
+                        Button("Retry") {
                             loadPosts()
                         }
                         .padding(.horizontal, 30)
@@ -52,7 +52,7 @@ struct HomeView: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 60))
                             .foregroundColor(.gray.opacity(0.5))
-                        Text("暂无帖子")
+                        Text("No Posts Yet")
                             .font(.headline)
                             .foregroundColor(.gray)
                     }

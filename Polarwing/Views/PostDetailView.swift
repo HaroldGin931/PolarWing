@@ -41,7 +41,7 @@ struct PostDetailView: View {
     }
     
     var displayTitle: String {
-        post.title ?? post.contentTitle ?? "无标题"
+        post.title ?? post.contentTitle ?? "Untitled"
     }
     
     var displayContent: String {
@@ -166,8 +166,8 @@ struct PostDetailView: View {
                     Divider()
                         .padding(.vertical, 8)
                     
-                    // 评论区标题
-                    Text("评论")
+                    // Comments section title
+                    Text("Comments")
                         .font(.headline)
                         .padding(.bottom, 8)
                     
@@ -176,7 +176,7 @@ struct PostDetailView: View {
                         ProgressView()
                             .padding()
                     } else if comments.isEmpty {
-                        Text("暂无评论，快来抢沙发吧~")
+                        Text("No comments yet. Be the first to comment!")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding()
@@ -192,7 +192,7 @@ struct PostDetailView: View {
         .safeAreaInset(edge: .bottom) {
             // 发表评论输入框
             HStack(spacing: 12) {
-                TextField("写下你的评论...", text: $commentText, axis: .vertical)
+                TextField("Write your comment...", text: $commentText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .padding(10)
                     .background(Color.gray.opacity(0.2))
@@ -228,22 +228,22 @@ struct PostDetailView: View {
             isLiked = likeManager.isLiked(postId: post.id)
             likeCount = likeManager.getLikeCount(postId: post.id, defaultCount: post.likeCount)
         }
-        .alert("🔍 调试信息", isPresented: $showDebugInfo) {
-            Button("复制帖子ID", role: .none) {
+        .alert("🔍 Debug Info", isPresented: $showDebugInfo) {
+            Button("Copy Post ID", role: .none) {
                 UIPasteboard.general.string = post.id
             }
-            Button("复制用户地址", role: .none) {
+            Button("Copy User Address", role: .none) {
                 UIPasteboard.general.string = post.author
             }
-            Button("关闭", role: .cancel) {}
+            Button("Close", role: .cancel) {}
         } message: {
             VStack(alignment: .leading, spacing: 8) {
-                Text("📝 帖子ID:\n\(post.id)")
-                Text("\n👤 用户地址:\n\(post.author)")
-                Text("\n🔤 用户名:\n\(post.username)")
-                Text("\n📅 创建时间:\n\(post.createdAt)")
+                Text("📝 Post ID:\n\(post.id)")
+                Text("\n👤 User Address:\n\(post.author)")
+                Text("\n🔤 Username:\n\(post.username)")
+                Text("\n📅 Created At:\n\(post.createdAt)")
                 if let mediaUrls = post.mediaUrls ?? post.contentMediaUrls, !mediaUrls.isEmpty {
-                    Text("\n🖼️ 媒体URL:\n\(mediaUrls.joined(separator: "\n"))")
+                    Text("\n🖼️ Media URL:\n\(mediaUrls.joined(separator: "\n"))")
                 }
             }
         }
